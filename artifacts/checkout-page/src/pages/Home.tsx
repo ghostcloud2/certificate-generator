@@ -208,8 +208,15 @@ export default function Home() {
         </Button>
       </section>
 
-      <footer className="py-8 px-6 text-center text-sm text-muted-foreground border-t border-border/50">
-        © {new Date().getFullYear()} AIDRA Labs. All rights reserved.
+      <footer className="py-8 px-6 text-center text-sm text-muted-foreground border-t border-border/50 space-y-2">
+        <p>© {new Date().getFullYear()} AIDRA Labs. All rights reserved.</p>
+        <a
+          href="/certificate"
+          className="inline-block text-primary underline underline-offset-2 hover:opacity-70 transition-opacity"
+          data-testid="link-certificate-preview"
+        >
+          Already completed the course? View your certificate
+        </a>
       </footer>
     </div>
   );
