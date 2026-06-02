@@ -1,6 +1,7 @@
 import { logger } from "./logger";
 import puppeteer from "puppeteer-core";
 import { existsSync } from "fs";
+import { execFileSync } from "child_process";
 
 const SEEIT_SLUG = "get-you-sorted-95GtR6Mbn7-cAU6g8Y30E";
 const SEEIT_LOCKED_URL = `https://app.seeit.co/locked/${SEEIT_SLUG}`;
@@ -40,6 +41,17 @@ async function getChromiumExecutable(): Promise<string | undefined> {
   for (const p of candidates) {
     if (existsSync(p)) return p;
   }
+
+  // Fallback: ask the shell where chromium lives (handles Nix store paths)
+  for (const bin of ["chromium", "chromium-browser", "google-chrome", "google-chrome-stable"]) {
+    try {
+      const resolved = execFileSync("which", [bin], { encoding: "utf8" }).trim();
+      if (resolved && existsSync(resolved)) return resolved;
+    } catch {
+      // not on PATH
+    }
+  }
+
   return undefined;
 }
 
