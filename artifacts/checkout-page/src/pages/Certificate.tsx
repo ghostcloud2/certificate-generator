@@ -61,7 +61,8 @@ export default function Certificate() {
   const handleDownload = async () => {
     const result = await refetch();
     if (result.data?.checkoutUrl) {
-      window.location.href = result.data.checkoutUrl;
+      const target = window.top ?? window;
+      target.location.href = result.data.checkoutUrl;
     }
   };
 
