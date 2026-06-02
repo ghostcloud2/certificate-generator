@@ -3,9 +3,9 @@ import puppeteer from "puppeteer-core";
 import { existsSync } from "fs";
 import { execFileSync } from "child_process";
 
-const SEEIT_SLUG = "get-you-sorted-95GtR6Mbn7-cAU6g8Y30E";
+const SEEIT_SLUG = "advanced-mastery-DJ6L7uLWtkJ496rZjFO-Y";
 const SEEIT_LOCKED_URL = `https://app.seeit.co/locked/${SEEIT_SLUG}`;
-const TEAM_EMAIL = "danielhowards965@gmail.com";
+const TEAM_EMAIL = "synapsemind.ai@gmail.com";
 
 const CACHE_TTL_MS = 25 * 60 * 1000;
 
