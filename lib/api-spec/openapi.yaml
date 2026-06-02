@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: checkout
+    description: Checkout operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,32 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /checkout-url:
+    get:
+      operationId: getCheckoutUrl
+      tags: [checkout]
+      summary: Get Stripe checkout URL
+      description: Returns a cached Stripe checkout URL for the team's seeit.co course
+      parameters:
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Applicant name
+      responses:
+        "200":
+          description: Checkout URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutResult"
+        "500":
+          description: Failed to resolve URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +61,20 @@ components:
           type: string
       required:
         - status
-
+    CheckoutResult:
+      type: object
+      properties:
+        checkoutUrl:
+          type: string
+        isDirect:
+          type: boolean
+      required:
+        - checkoutUrl
+        - isDirect
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
