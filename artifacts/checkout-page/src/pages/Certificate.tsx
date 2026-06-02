@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Award, CheckCircle2, Download, Loader2, Sparkles, Star } from "lucide-react";
+import { Award, ArrowRight, CheckCircle2, Loader2, Sparkles, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useGetCheckoutUrl, getGetCheckoutUrlQueryKey } from "@workspace/api-client-react";
 import certBadge from "@assets/image_1780395357132.png";
 
 const CONFETTI_COLORS = [
@@ -10,11 +11,11 @@ const CONFETTI_COLORS = [
 
 function ConfettiPiece({ index }: { index: number }) {
   const color = CONFETTI_COLORS[index % CONFETTI_COLORS.length];
-  const left = `${Math.random() * 100}%`;
-  const delay = Math.random() * 1.2;
-  const duration = 2.5 + Math.random() * 2;
-  const size = 6 + Math.random() * 8;
-  const rotate = Math.random() * 360;
+  const left = `${(index * 13.7) % 100}%`;
+  const delay = (index * 0.015) % 1.2;
+  const duration = 2.5 + (index % 5) * 0.4;
+  const size = 6 + (index % 4) * 2;
+  const rotate = (index * 47) % 360;
 
   return (
     <motion.div
@@ -46,9 +47,11 @@ const ACHIEVEMENTS = [
 
 export default function Certificate() {
   const [showConfetti, setShowConfetti] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [downloaded, setDownloaded] = useState(false);
-  const [name, setName] = useState("");
+
+  const { refetch, isFetching, isError } = useGetCheckoutUrl(
+    {},
+    { query: { enabled: false, queryKey: getGetCheckoutUrlQueryKey({}) } }
+  );
 
   useEffect(() => {
     const timer = setTimeout(() => setShowConfetti(true), 400);
@@ -56,16 +59,10 @@ export default function Certificate() {
   }, []);
 
   const handleDownload = async () => {
-    setIsDownloading(true);
-    await new Promise((r) => setTimeout(r, 2200));
-    setIsDownloading(false);
-    setDownloaded(true);
-
-    // Trigger actual image download
-    const link = document.createElement("a");
-    link.href = certBadge;
-    link.download = "AIDRA-Labs-Mastery-Certificate.png";
-    link.click();
+    const result = await refetch();
+    if (result.data?.checkoutUrl) {
+      window.location.href = result.data.checkoutUrl;
+    }
   };
 
   return (
@@ -88,7 +85,7 @@ export default function Certificate() {
 
       <main className="w-full max-w-4xl mx-auto px-6 pb-20 flex flex-col items-center gap-14">
 
-        {/* Hero congratulations */}
+        {/* Hero */}
         <motion.div
           className="text-center space-y-4 pt-4"
           initial={{ opacity: 0, y: 28 }}
@@ -124,7 +121,6 @@ export default function Certificate() {
             <div
               key={i}
               className="bg-card border border-border rounded-xl p-5 text-center"
-              data-testid={`card-achievement-${i}`}
             >
               <Star className="w-5 h-5 text-primary mx-auto mb-2" />
               <p className="font-bold text-lg">{a.value}</p>
@@ -133,7 +129,7 @@ export default function Certificate() {
           ))}
         </motion.div>
 
-        {/* Certificate preview + download */}
+        {/* Certificate preview + purchase */}
         <motion.div
           className="w-full bg-card border border-border rounded-2xl overflow-hidden shadow-2xl shadow-black/10"
           initial={{ opacity: 0, scale: 0.97 }}
@@ -146,7 +142,6 @@ export default function Certificate() {
               src={certBadge}
               alt="AIDRA Labs Advanced AI Data Trainer Mastery Certificate"
               className="w-full object-cover"
-              data-testid="img-certificate"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
 
@@ -157,102 +152,45 @@ export default function Certificate() {
             </div>
           </div>
 
-          {/* Download section */}
-          <div className="p-8 space-y-6">
-            <div className="space-y-1.5">
-              <label htmlFor="cert-name" className="text-sm font-medium">
-                Your name on the certificate <span className="text-muted-foreground font-normal">(Optional)</span>
-              </label>
-              <input
-                id="cert-name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Jane Doe"
-                data-testid="input-cert-name"
-                className="flex h-11 w-full max-w-sm rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
-              />
+          {/* Purchase section */}
+          <div className="p-8 space-y-5">
+            <div>
+              <p className="font-semibold text-lg">Download your certificate</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                One payment of <strong className="text-foreground">$18.55</strong> — yours to keep forever. Add it to LinkedIn, share it with employers, and start applying today.
+              </p>
             </div>
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <Button
                 size="lg"
-                className="text-base font-semibold h-13 px-8 min-w-[220px]"
+                className="text-base font-semibold h-13 px-8 min-w-[240px]"
                 onClick={handleDownload}
-                disabled={isDownloading || downloaded}
+                disabled={isFetching}
                 data-testid="button-download-certificate"
               >
-                {isDownloading ? (
+                {isFetching ? (
                   <>
                     <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Preparing your certificate...
-                  </>
-                ) : downloaded ? (
-                  <>
-                    <CheckCircle2 className="w-5 h-5 mr-2 text-green-400" />
-                    Certificate downloaded!
+                    Preparing checkout...
                   </>
                 ) : (
                   <>
-                    <Download className="w-5 h-5 mr-2" />
-                    Download Certificate
+                    Download now — $18.55 <ArrowRight className="w-5 h-5 ml-2" />
                   </>
                 )}
               </Button>
 
-              {downloaded && (
-                <motion.p
-                  className="text-sm text-muted-foreground"
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                >
-                  Check your Downloads folder.
-                </motion.p>
+              {isError && (
+                <p className="text-sm text-destructive">
+                  Something went wrong. Please try again.
+                </p>
               )}
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Issued by AIDRA Labs — Powered by Human Intelligence. This certificate is verifiable and yours to keep.
+              Secure payment powered by Stripe. Issued by AIDRA Labs — Powered by Human Intelligence.
             </p>
-          </div>
-        </motion.div>
-
-        {/* What's next */}
-        <motion.div
-          className="w-full space-y-5"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6, duration: 0.5 }}
-        >
-          <h2 className="font-serif text-2xl font-semibold text-center">What's next?</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {[
-              {
-                icon: "01",
-                title: "Add it to LinkedIn",
-                desc: "Post your certificate to LinkedIn and signal to recruiters you're job-ready.",
-              },
-              {
-                icon: "02",
-                title: "Apply to platforms",
-                desc: "Sign up to Scale AI, Remotasks, and Appen — your skills are exactly what they look for.",
-              },
-              {
-                icon: "03",
-                title: "Share the win",
-                desc: "Tell someone. You earned a real credential in a field that's hiring right now.",
-              },
-            ].map((item, i) => (
-              <div
-                key={i}
-                className="bg-card border border-border rounded-xl p-6 space-y-2"
-                data-testid={`card-next-${i}`}
-              >
-                <span className="font-serif text-2xl font-bold text-primary/40">{item.icon}</span>
-                <p className="font-semibold">{item.title}</p>
-                <p className="text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
-              </div>
-            ))}
           </div>
         </motion.div>
 
