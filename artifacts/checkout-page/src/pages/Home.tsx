@@ -139,7 +139,7 @@ export default function Home() {
                   </>
                 ) : (
                   <>
-                    Enrol now — $18.55 <ArrowRight className="w-5 h-5 ml-2" />
+                    Download now — $18.55 <ArrowRight className="w-5 h-5 ml-2" />
                   </>
                 )}
               </Button>
