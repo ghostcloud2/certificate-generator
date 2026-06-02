@@ -77,9 +77,12 @@ async function runPuppeteer(): Promise<CheckoutResult> {
         "--disable-dev-shm-usage",
         "--disable-gpu",
         "--no-first-run",
-        "--no-zygote",
-        "--single-process",
         "--disable-extensions",
+        "--disable-background-timer-throttling",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-renderer-backgrounding",
+        "--disable-features=TranslateUI",
+        "--disable-ipc-flooding-protection",
       ],
     });
 
