@@ -6,12 +6,12 @@ import heroBanner from "@assets/image_1780395469864.png";
 import certBadge from "@assets/image_1780395357132.png";
 
 const WHAT_YOU_LEARN = [
-  "Understand the AI Data Trainer role",
-  "Master key AI training vocabulary",
-  "Apply rating, ranking & annotation",
-  "Label and classify AI errors",
-  "Write effective training prompts",
-  "Land entry-level AI training jobs",
+  "Understand the full AI Data Trainer role and how companies hire for it",
+  "Master the vocabulary every AI hiring manager wants to hear",
+  "Apply rating, ranking & annotation like a professional",
+  "Label and classify AI outputs with precision",
+  "Write high-quality prompts that actually improve models",
+  "Build a portfolio and land your first paid AI contract",
 ];
 
 const MODULES = [
@@ -155,10 +155,10 @@ export default function Home() {
       {/* What you'll learn */}
       <section className="max-w-4xl mx-auto px-6 py-16 text-center">
         <h2 className="font-serif text-3xl font-semibold mb-3" data-testid="text-learn-heading">
-          What You'll Learn in This Course
+          Skills You'll Be Certified In
         </h2>
         <p className="text-muted-foreground max-w-xl mx-auto mb-10">
-          This 2-hour course will take you from zero to job-ready. Each module builds on the last — by the end, you'll have real skills that companies pay for.
+          This certificate proves you have the skills companies are actively hiring for. Add it to your LinkedIn profile and start applying to Scale AI, Remotasks, and Appen today.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
           {WHAT_YOU_LEARN.map((item, i) => (
