@@ -2,8 +2,12 @@ import { logger } from "./logger";
 
 const SEEIT_SLUG = "advanced-mastery-DJ6L7uLWtkJ496rZjFO-Y";
 const SEEIT_LOCKED_URL = `https://app.seeit.co/locked/${SEEIT_SLUG}`;
+const SEEIT_LINK_ID = "DJ6L7uLWtkJ496rZjFO-Y";
 const TEAM_EMAIL = "synapsemind.ai@gmail.com";
 const UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+// seeit.co Next.js Server Action ID for createStripeCheckout
+const NEXT_ACTION_ID = "7f5938fa5a8abeca04723c2a717d40ad24a9c09c5f";
 
 const CACHE_TTL_MS = 25 * 60 * 1000;
 
@@ -26,115 +30,61 @@ function getEnvOverride(): CheckoutResult | null {
   return null;
 }
 
-// ─── Strategy 2: Puppeteer with @sparticuz/chromium (works in prod) ──────────
-async function getStripeUrlViaBrowser(): Promise<CheckoutResult | null> {
-  let executablePath: string | undefined;
-  let sparticuzArgs: string[] = [];
-
-  // Try @sparticuz/chromium first — built for restricted/serverless environments
+// ─── Strategy 2: seeit.co Server Action (pure HTTP, no browser needed) ───────
+// seeit.co is a Next.js app on Vercel. Its "Unlock" button calls a Next.js
+// Server Action that creates a Stripe Checkout Session and returns the URL.
+// We call that Server Action directly via POST with the Next-Action header —
+// no Puppeteer, no Chromium, works in any environment.
+async function getStripeUrlViaServerAction(): Promise<CheckoutResult | null> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const chromium = require("@sparticuz/chromium");
-    executablePath = await chromium.executablePath();
-    sparticuzArgs = chromium.args ?? [];
-    logger.info({ executablePath }, "Using @sparticuz/chromium");
-  } catch {
-    logger.info("@sparticuz/chromium not available, trying system Chromium");
-  }
+    logger.info("Calling seeit.co Server Action to get Stripe checkout URL");
 
-  // Fall back to system Chromium (works in dev/Nix)
-  if (!executablePath) {
-    try {
-      const { existsSync } = await import("fs");
-      const { execFileSync } = await import("child_process");
+    const body = JSON.stringify([{
+      email: TEAM_EMAIL,
+      linkId: SEEIT_LINK_ID,
+      pathname: `/locked/${SEEIT_SLUG}`,
+    }]);
 
-      const candidates = [
-        process.env.CHROME_EXECUTABLE_PATH,
-        "/usr/bin/google-chrome-stable",
-        "/usr/bin/chromium",
-        "/usr/bin/chromium-browser",
-      ].filter(Boolean) as string[];
-
-      for (const p of candidates) {
-        if (existsSync(p)) { executablePath = p; break; }
-      }
-
-      if (!executablePath) {
-        for (const bin of ["chromium", "chromium-browser", "google-chrome"]) {
-          try {
-            const resolved = execFileSync("which", [bin], { encoding: "utf8" }).trim();
-            if (resolved && existsSync(resolved)) { executablePath = resolved; break; }
-          } catch { /* not found */ }
-        }
-      }
-    } catch { /* ignore */ }
-  }
-
-  if (!executablePath) {
-    logger.warn("No Chromium binary found");
-    return null;
-  }
-
-  let browser;
-  try {
-    const puppeteer = (await import("puppeteer-core")).default;
-    logger.info({ executablePath }, "Launching headless browser");
-
-    const defaultArgs = [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--no-first-run",
-      "--disable-extensions",
-      "--disable-background-timer-throttling",
-      "--disable-backgrounding-occluded-windows",
-      "--disable-renderer-backgrounding",
-      "--disable-features=TranslateUI",
-      "--disable-ipc-flooding-protection",
-    ];
-
-    // Merge sparticuz args (deduplicated)
-    const allArgs = [...new Set([...sparticuzArgs, ...defaultArgs])];
-
-    browser = await puppeteer.launch({
-      executablePath,
-      headless: true,
-      args: allArgs,
+    const res = await fetch(SEEIT_LOCKED_URL, {
+      method: "POST",
+      headers: {
+        "Next-Action": NEXT_ACTION_ID,
+        "Content-Type": "application/json",
+        "Origin": "https://app.seeit.co",
+        "Referer": SEEIT_LOCKED_URL,
+        "User-Agent": UA,
+      },
+      body,
+      signal: AbortSignal.timeout(20000),
     });
 
-    const page = await browser.newPage();
-    await page.setUserAgent(UA);
+    if (!res.ok) {
+      logger.warn({ status: res.status }, "seeit.co Server Action returned non-OK status");
+      return null;
+    }
 
-    logger.info("Navigating to seeit.co locked page");
-    await page.goto(SEEIT_LOCKED_URL, { waitUntil: "networkidle2", timeout: 25000 });
+    const text = await res.text();
 
-    const emailSelector = 'input[type="email"], input[name="email"], input[placeholder*="mail" i]';
-    await page.waitForSelector(emailSelector, { timeout: 15000 });
-    await page.click(emailSelector, { count: 3 } as never);
-    await page.type(emailSelector, TEAM_EMAIL, { delay: 30 });
-    await new Promise<void>(r => setTimeout(r, 600));
+    // The RSC streaming response contains a line like:
+    // 1:{"data":{"data":"https://checkout.stripe.com/...","error":null,"success":true}}
+    const jsonMatch = text.match(/\d+:\{"data":\{"data":"(https:\/\/checkout\.stripe\.com\/[^"\\]+)"/);
+    if (jsonMatch?.[1]) {
+      const url = jsonMatch[1];
+      logger.info({ url }, "Got Stripe URL from seeit.co Server Action");
+      return { checkoutUrl: url, isDirect: true };
+    }
 
-    const clicked = await page.evaluate(`(function(){
-      var btn = document.querySelector('button[type="submit"]') ||
-        Array.from(document.querySelectorAll('button')).find(function(b){
-          return /unlock|pay|purchase/i.test(b.textContent || '');
-        });
-      if (btn) { btn.click(); return true; }
-      return false;
-    })()`);
+    // Broader fallback pattern
+    const stripeMatch = text.match(/https:\/\/checkout\.stripe\.com\/c\/pay\/[^"\\]+/);
+    if (stripeMatch) {
+      logger.info({ url: stripeMatch[0] }, "Got Stripe URL from seeit.co Server Action (broad match)");
+      return { checkoutUrl: stripeMatch[0], isDirect: true };
+    }
 
-    if (!clicked) await page.keyboard.press("Enter");
-
-    await page.waitForFunction(`window.location.href.includes("stripe.com")`, { timeout: 25000, polling: 500 });
-
-    const stripeUrl = page.url();
-    logger.info({ stripeUrl }, "Got Stripe URL via browser automation");
-    await browser.close();
-    return { checkoutUrl: stripeUrl, isDirect: true };
+    logger.warn({ responseSnippet: text.slice(0, 300) }, "No Stripe URL found in Server Action response");
+    return null;
   } catch (err) {
-    logger.warn({ err }, "Browser automation failed");
-    try { await browser?.close(); } catch { /* ignore */ }
+    logger.warn({ err }, "seeit.co Server Action call failed");
     return null;
   }
 }
@@ -146,8 +96,8 @@ async function resolveStripeUrl(): Promise<CheckoutResult> {
   const envResult = getEnvOverride();
   if (envResult) return envResult;
 
-  const browserResult = await getStripeUrlViaBrowser();
-  if (browserResult?.isDirect) return browserResult;
+  const serverActionResult = await getStripeUrlViaServerAction();
+  if (serverActionResult?.isDirect) return serverActionResult;
 
   logger.error("All strategies failed — serving seeit.co locked URL as fallback");
   return fallback;

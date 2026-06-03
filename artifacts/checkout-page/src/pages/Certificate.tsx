@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Award, ArrowRight, CheckCircle2, Sparkles, Star } from "lucide-react";
+import { Award, ArrowRight, CheckCircle2, Sparkles, Star, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useGetCheckoutUrl } from "@workspace/api-client-react";
 import certBadge from "@assets/image_1780395357132.png";
-
-const SEEIT_URL = "https://app.seeit.co/locked/advanced-mastery-DJ6L7uLWtkJ496rZjFO-Y";
 
 const CONFETTI_COLORS = [
   "#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#f43f5e",
@@ -48,6 +47,11 @@ const ACHIEVEMENTS = [
 
 export default function Certificate() {
   const [showConfetti, setShowConfetti] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
+
+  const { data, isLoading, isError } = useGetCheckoutUrl(undefined, {
+    query: { staleTime: 20 * 60 * 1000 },
+  });
 
   useEffect(() => {
     const timer = setTimeout(() => setShowConfetti(true), 400);
@@ -55,8 +59,12 @@ export default function Certificate() {
   }, []);
 
   const handleDownload = () => {
-    window.open(SEEIT_URL, "_blank", "noopener,noreferrer");
+    if (!data?.checkoutUrl) return;
+    setRedirecting(true);
+    window.location.href = data.checkoutUrl;
   };
+
+  const buttonDisabled = isLoading || redirecting || !data?.checkoutUrl;
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-start overflow-x-hidden">
@@ -154,9 +162,26 @@ export default function Certificate() {
                 size="lg"
                 className="text-base font-semibold h-13 px-8 min-w-[240px]"
                 onClick={handleDownload}
+                disabled={buttonDisabled}
                 data-testid="button-download-certificate"
               >
-                Download now — $18.55 <ArrowRight className="w-5 h-5 ml-2" />
+                {redirecting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Redirecting…
+                  </>
+                ) : isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Loading…
+                  </>
+                ) : isError ? (
+                  "Unavailable — try again later"
+                ) : (
+                  <>
+                    Download now — $18.55 <ArrowRight className="w-5 h-5 ml-2" />
+                  </>
+                )}
               </Button>
             </div>
 
