@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Award, ArrowRight, CheckCircle2, Loader2, Sparkles, Star } from "lucide-react";
+import { Award, ArrowRight, CheckCircle2, Sparkles, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useGetCheckoutUrl, getGetCheckoutUrlQueryKey } from "@workspace/api-client-react";
 import certBadge from "@assets/image_1780395357132.png";
+
+const SEEIT_URL = "https://app.seeit.co/locked/advanced-mastery-DJ6L7uLWtkJ496rZjFO-Y";
 
 const CONFETTI_COLORS = [
   "#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#f43f5e",
@@ -48,25 +49,13 @@ const ACHIEVEMENTS = [
 export default function Certificate() {
   const [showConfetti, setShowConfetti] = useState(false);
 
-  const { refetch, isFetching, isError } = useGetCheckoutUrl(
-    {},
-    { query: { enabled: false, queryKey: getGetCheckoutUrlQueryKey({}) } }
-  );
-
   useEffect(() => {
     const timer = setTimeout(() => setShowConfetti(true), 400);
     return () => clearTimeout(timer);
   }, []);
 
-  const handleDownload = async () => {
-    const result = await refetch();
-    if (result.data?.checkoutUrl) {
-      try {
-        (window.top ?? window).location.href = result.data.checkoutUrl;
-      } catch {
-        window.open(result.data.checkoutUrl, "_blank");
-      }
-    }
+  const handleDownload = () => {
+    window.open(SEEIT_URL, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -165,24 +154,10 @@ export default function Certificate() {
                 size="lg"
                 className="text-base font-semibold h-13 px-8 min-w-[240px]"
                 onClick={handleDownload}
-                disabled={isFetching}
                 data-testid="button-download-certificate"
               >
-                {isFetching ? (
-                  <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Preparing checkout...
-                  </>
-                ) : (
-                  <>
-                    Download now — $18.55 <ArrowRight className="w-5 h-5 ml-2" />
-                  </>
-                )}
+                Download now — $18.55 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
-
-              {isError && (
-                <p className="text-sm text-destructive">Something went wrong. Please try again.</p>
-              )}
             </div>
 
             <p className="text-xs text-muted-foreground">
