@@ -1,9 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Award, ArrowRight, CheckCircle2, Sparkles, Star, Loader2 } from "lucide-react";
+import { Award, ArrowRight, CheckCircle2, Sparkles, Star, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useGetCheckoutUrl } from "@workspace/api-client-react";
 import certBadge from "@assets/image_1780395357132.png";
+
+const SESSION_KEY = "aidra_checkout_url";
+const BOUNCE_DELAY_MS = 2000;
 
 const CONFETTI_COLORS = [
   "#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#f43f5e",
@@ -16,7 +19,6 @@ function ConfettiPiece({ index }: { index: number }) {
   const duration = 2.5 + (index % 5) * 0.4;
   const size = 6 + (index % 4) * 2;
   const rotate = (index * 47) % 360;
-
   return (
     <motion.div
       className="absolute top-0 rounded-sm pointer-events-none"
@@ -32,9 +34,7 @@ function Confetti() {
   const pieces = Array.from({ length: 80 }, (_, i) => i);
   return (
     <div className="fixed inset-0 overflow-hidden pointer-events-none z-50">
-      {pieces.map((i) => (
-        <ConfettiPiece key={i} index={i} />
-      ))}
+      {pieces.map((i) => <ConfettiPiece key={i} index={i} />)}
     </div>
   );
 }
@@ -45,9 +45,80 @@ const ACHIEVEMENTS = [
   { label: "Certification", value: "Mastery Level" },
 ];
 
+function BounceBackBanner({
+  checkoutUrl,
+  onDismiss,
+}: {
+  checkoutUrl: string;
+  onDismiss: () => void;
+}) {
+  const [countdown, setCountdown] = useState(Math.ceil(BOUNCE_DELAY_MS / 1000));
+  const redirectedRef = useRef(false);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCountdown((c) => Math.max(0, c - 1));
+    }, 1000);
+
+    const timer = setTimeout(() => {
+      if (!redirectedRef.current) {
+        redirectedRef.current = true;
+        sessionStorage.removeItem(SESSION_KEY);
+        window.location.href = checkoutUrl;
+      }
+    }, BOUNCE_DELAY_MS);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timer);
+    };
+  }, [checkoutUrl]);
+
+  const handleDismiss = () => {
+    redirectedRef.current = true;
+    sessionStorage.removeItem(SESSION_KEY);
+    onDismiss();
+  };
+
+  return (
+    <motion.div
+      className="fixed bottom-6 left-1/2 z-50 w-full max-w-md"
+      style={{ x: "-50%" }}
+      initial={{ y: 80, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: 80, opacity: 0 }}
+      transition={{ type: "spring", stiffness: 380, damping: 30 }}
+    >
+      <div className="mx-4 bg-foreground text-background rounded-2xl px-5 py-4 shadow-2xl flex items-center gap-4">
+        <Loader2 className="w-5 h-5 shrink-0 animate-spin" />
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm leading-tight">Taking you back to checkout</p>
+          <p className="text-xs opacity-70 mt-0.5">
+            Redirecting in {countdown}s…{" "}
+            <button
+              className="underline underline-offset-2 hover:no-underline"
+              onClick={handleDismiss}
+            >
+              Stay here
+            </button>
+          </p>
+        </div>
+        <button
+          onClick={handleDismiss}
+          className="shrink-0 opacity-60 hover:opacity-100 transition-opacity"
+          aria-label="Dismiss"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
 export default function Certificate() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
+  const [bouncedUrl, setBouncedUrl] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useGetCheckoutUrl(undefined, {
     query: { staleTime: 20 * 60 * 1000 },
@@ -58,8 +129,14 @@ export default function Certificate() {
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    const saved = sessionStorage.getItem(SESSION_KEY);
+    if (saved) setBouncedUrl(saved);
+  }, []);
+
   const handleDownload = () => {
     if (!data?.checkoutUrl) return;
+    sessionStorage.setItem(SESSION_KEY, data.checkoutUrl);
     setRedirecting(true);
     window.location.href = data.checkoutUrl;
   };
@@ -69,6 +146,15 @@ export default function Certificate() {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-start overflow-x-hidden">
       <AnimatePresence>{showConfetti && <Confetti />}</AnimatePresence>
+
+      <AnimatePresence>
+        {bouncedUrl && (
+          <BounceBackBanner
+            checkoutUrl={bouncedUrl}
+            onDismiss={() => setBouncedUrl(null)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Top accent bar */}
       <div className="w-full h-1.5 bg-gradient-to-r from-violet-500 via-primary to-indigo-500" />
